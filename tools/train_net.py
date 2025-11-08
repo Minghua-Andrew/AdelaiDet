@@ -50,9 +50,9 @@ from detectron2.data import DatasetCatalog
 from detectron2.data.datasets.coco import load_coco_json            
 
 
-CLASS_NAMES = ["background","sample"]                   # 如果没有标注background类,就不要写了，要不然后面提取报错
+CLASS_NAMES = ["background","blast"]                   # 如果没有标注background类,就不要写了，要不然后面提取报错
 
-DATASET_ROOT = 'datasets/coco'                            # 数据集根目录，根据实际情况修改
+DATASET_ROOT = 'datasetsss/coco'                            # 数据集根目录，根据实际情况修改
 ANN_ROOT = os.path.join(DATASET_ROOT, 'annotations')
 TRAIN_PATH = os.path.join(DATASET_ROOT, 'train2017')  # <--- 已修正
 VAL_PATH = os.path.join(DATASET_ROOT, 'val2017')    # <--- 已修正
@@ -232,8 +232,8 @@ def setup(args):
     cfg.merge_from_list(args.opts)
     cfg.DATASETS.TRAIN = ("coco_my_train",)             #训练数据集名称
     cfg.DATASETS.TEST = ("coco_my_val",)
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
-    cfg.MODEL.ROI_HEADS.CLASSES_NAME ="sample"          #标签类别
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2
+    cfg.MODEL.ROI_HEADS.CLASSES_NAME ="blast"          #标签类别
     cfg.MODEL.WEIGHTS = 'R_50_1x.pth'
     cfg.freeze()
     default_setup(cfg, args)

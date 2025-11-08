@@ -1,4 +1,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+
+import sys
+# [!!] 你的路径
+sys.path.append("D:\\一些资料\\wm的资料\\项目代码\\adelaidet-master\\AdelaiDet-master")
+print(sys.path)
+
 import argparse
 import glob
 import multiprocessing as mp
@@ -10,24 +16,44 @@ import tqdm
 from detectron2.data.detection_utils import read_image
 from detectron2.utils.logger import setup_logger
 
+# [!!] 导入 MetadataCatalog (和之前一样)
+from detectron2.data import MetadataCatalog
+
 from predictor import VisualizationDemo
 from adet.config import get_cfg
+
 
 # constants
 WINDOW_NAME = "COCO detections"
 
-
 def setup_cfg(args):
-    # load config from file and command-line arguments
+    """
+    Create configs and perform basic setups.
+    """
     cfg = get_cfg()
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+
+    # 1. 设置类别数量 (和之前一样)
+    # (根据 "bicycle" 错误，推断是2)
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2 
+
+    # [!!] 关键修复 [!!]
+    # 我们必须在 cfg.freeze() 之前设置 DATASETS.TEST
+    # ----------------------------------------------------
+    # 我们在这里硬编码一个数据集名称
+    test_dataset_name = "my_demo_dataset" 
+    cfg.DATASETS.TEST = (test_dataset_name,)
+    # ----------------------------------------------------
+
     # Set score_threshold for builtin models
     cfg.MODEL.RETINANET.SCORE_THRESH_TEST = args.confidence_threshold
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = args.confidence_threshold
     cfg.MODEL.FCOS.INFERENCE_TH_TEST = args.confidence_threshold
     cfg.MODEL.MEInst.INFERENCE_TH_TEST = args.confidence_threshold
     cfg.MODEL.PANOPTIC_FPN.COMBINE.INSTANCES_CONFIDENCE_THRESH = args.confidence_threshold
+    
+    # 冻结：现在 cfg 变成了不可变的
     cfg.freeze()
     return cfg
 
@@ -40,6 +66,7 @@ def get_parser():
         metavar="FILE",
         help="path to config file",
     )
+    # ... (get_parser 的其余部分代码不变) ...
     parser.add_argument("--webcam", action="store_true", help="Take inputs from webcam.")
     parser.add_argument("--video-input", help="Path to video file.")
     parser.add_argument("--input", nargs="+", help="A list of space separated input images")
@@ -70,10 +97,28 @@ if __name__ == "__main__":
     logger = setup_logger()
     logger.info("Arguments: " + str(args))
 
+    # cfg 已经被 setup_cfg 冻结，并且已包含 cfg.DATASETS.TEST
     cfg = setup_cfg(args)
+
+    # ---------- [!!] 开始：修改后的元数据设置 [!!] ----------
+    # 1. 定义你的类别 (和之前一样)
+    MY_CLASSES = ["background", "blast"] 
+    # (备选: MY_CLASSES = ["blast"])
+
+    # 2. 定义 *相同* 的数据集名称 (必须与 setup_cfg 中的一致)
+    test_dataset_name = "my_demo_dataset"
+
+    # 3. 关键：设置元数据 (和之前一样)
+    # (这一步是安全的，因为它不修改 cfg 对象)
+    MetadataCatalog.get(test_dataset_name).thing_classes = MY_CLASSES
+
+    # [!!] 之前导致错误的那行 `cfg.DATASETS.TEST = ...` 已经移动到 setup_cfg 中
+    # ---------- [!!] 结束 [!!] ----------
+
 
     demo = VisualizationDemo(cfg)
 
+    # ... (剩下的所有代码都和之前一样，无需改动) ...
     if args.input:
         if os.path.isdir(args.input[0]):
             args.input = [os.path.join(args.input[0], fname) for fname in os.listdir(args.input[0])]
@@ -129,8 +174,6 @@ if __name__ == "__main__":
             assert not os.path.isfile(output_fname), output_fname
             output_file = cv2.VideoWriter(
                 filename=output_fname,
-                # some installation of opencv may not support x264 (due to its license),
-                # you can try other format (e.g. MPEG)
                 fourcc=cv2.VideoWriter_fourcc(*"x264"),
                 fps=float(frames_per_second),
                 frameSize=(width, height),

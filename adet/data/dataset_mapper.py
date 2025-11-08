@@ -31,11 +31,15 @@ logger = logging.getLogger(__name__)
 def segmToRLE(segm, img_size):
     h, w = img_size
     if type(segm) == list:
+        # polygon -- a single object might consist of multiple parts
+        # we merge all parts into one mask rle code
         rles = maskUtils.frPyObjects(segm, h, w)
         rle = maskUtils.merge(rles)
     elif type(segm["counts"]) == list:
+        # uncompressed RLE
         rle = maskUtils.frPyObjects(segm, h, w)
     else:
+        # rle
         rle = segm
     return rle
 
@@ -54,6 +58,7 @@ class DatasetMapperWithBasis(DatasetMapper):
     def __init__(self, cfg, is_train=True):
         super().__init__(cfg, is_train)
 
+        # Rebuild augmentations
         logger.info(
             "Rebuilding the augmentations. The previous augmentations will be overridden."
         )
@@ -90,6 +95,13 @@ class DatasetMapperWithBasis(DatasetMapper):
             self.recompute_boxes = False
 
     def __call__(self, dataset_dict):
+        """
+        Args:
+            dataset_dict (dict): Metadata of one image, in Detectron2 Dataset format.
+
+        Returns:
+            dict: a format that builtin models in detectron2 accept
+        """
         if self.cfg.INPUT.IS_ROTATE:
             augmentation = self.augmentation[2:]
             pp = np.random.rand()
@@ -99,20 +111,19 @@ class DatasetMapperWithBasis(DatasetMapper):
             if pp1 < 0.5:
                 augmentation = [self.augmentation[1]] + augmentation
 
-        dataset_dict = copy.deepcopy(dataset_dict)
+        dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
+        # USER: Write your own image loading if it's not from a file
 
-        # -----------------------------
-        # 🔧 修复图像路径问题
-        # -----------------------------
-        file_name = dataset_dict["file_name"].replace("\\", "/")  # Windows路径统一为/
-        file_name = osp.normpath(file_name)
+        file_name = dataset_dict["file_name"].split('..')[0] + dataset_dict["file_name"].split('\\')[-1]
+        # file_name = dataset_dict["file_name"].split('\\')[-1]
         try:
-            image = utils.read_image(file_name, format=self.image_format)
+            image = utils.read_image(
+                file_name, format=self.image_format
+            )
         except Exception as e:
-            print(f"[Error] Failed to read image: {dataset_dict['file_name']}")
+            print(dataset_dict["file_name"])
             print(e)
             raise e
-
         try:
             utils.check_image_size(dataset_dict, image)
         except SizeMismatchError as e:
@@ -123,10 +134,10 @@ class DatasetMapperWithBasis(DatasetMapper):
                 image = image.transpose(1, 0, 2)
             else:
                 raise e
-        if image.shape[1] == 0 or image.shape[0] == 0:
+        if image.shape[1]==0 or image.shape[0]==0:
             print(dataset_dict)
             raise e
-
+        # USER: Remove if you don't do semantic/panoptic segmentation.
         if "sem_seg_file_name" in dataset_dict:
             sem_seg_gt = utils.read_image(
                 dataset_dict.pop("sem_seg_file_name"), "L"
@@ -146,17 +157,21 @@ class DatasetMapperWithBasis(DatasetMapper):
         transforms = aug_input.apply_augmentations(self.augmentation)
         image, sem_seg_gt = aug_input.image, aug_input.sem_seg
 
-        image_shape = image.shape[:2]
-        if image.shape[1] == 0 or image.shape[0] == 0:
+        image_shape = image.shape[:2]  # h, w
+        if image.shape[1]==0 or image.shape[0]==0:
             print(dataset_dict)
             raise e
-
+        # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory,
+        # but not efficient on large generic dataset structures due to the use of pickle & mp.Queue.
+        # Therefore it's important to use torch.Tensor.
         dataset_dict["image"] = torch.as_tensor(
             np.ascontiguousarray(image.transpose(2, 0, 1))
         )
         if sem_seg_gt is not None:
             dataset_dict["sem_seg"] = torch.as_tensor(sem_seg_gt.astype("long"))
 
+        # USER: Remove if you don't use pre-computed proposals.
+        # Most users would not need this feature.
         if self.proposal_topk:
             utils.transform_proposals(
                 dataset_dict,
@@ -173,12 +188,14 @@ class DatasetMapperWithBasis(DatasetMapper):
             return dataset_dict
 
         if "annotations" in dataset_dict:
+            # USER: Modify this if you want to keep them for some reason.
             for anno in dataset_dict["annotations"]:
                 if not self.use_instance_mask:
                     anno.pop("segmentation", None)
                 if not self.use_keypoint:
                     anno.pop("keypoints", None)
 
+            # USER: Implement additional transformations if you have other types of dataset
             annos = [
                 transform_instance_annotations(
                     obj,
@@ -193,32 +210,33 @@ class DatasetMapperWithBasis(DatasetMapper):
                 annos, image_shape, mask_format=self.instance_mask_format
             )
 
+            # After transforms such as cropping are applied, the bounding box may no longer
+            # tightly bound the object. As an example, imagine a triangle object
+            # [(0,0), (2,0), (0,2)] cropped by a box [(1,0),(2,2)] (XYXY format). The tight
+            # bounding box of the cropped triangle should be [(1,0),(2,1)], which is not equal to
             if self.recompute_boxes:
                 instances.gt_boxes = instances.gt_masks.get_bounding_boxes()
             dataset_dict["instances"] = utils.filter_empty_instances(instances)
 
-        # -----------------------------
-        # 🔧 修复 basis_sem 路径问题
-        # -----------------------------
         if self.basis_loss_on and self.is_train:
+            # load basis supervisions
             if self.ann_set == "coco":
-                basis_sem_path = dataset_dict["file_name"].replace("train", "thing_train")
+                basis_sem_path = (
+                    dataset_dict["file_name"]
+                    .replace("train", "thing_train")
+                )
             else:
-                basis_sem_path = dataset_dict["file_name"].replace("coco", "lvis").replace("train2017", "thing_train2017")
-
-            # 修复路径分隔符并生成 npz 路径
-            basis_sem_path = basis_sem_path.replace("\\", "/")
-            basis_sem_path = osp.normpath(osp.splitext(basis_sem_path)[0] + ".npz")
-
-            try:
-                basis_sem_gt = np.load(basis_sem_path)["mask"]
-            except Exception as e:
-                print(f"[Error] Failed to load basis_sem file: {basis_sem_path}")
-                print(e)
-                raise e
-
+                basis_sem_path = (
+                    dataset_dict["file_name"]
+                    .replace("coco", "lvis")
+                    .replace("train2017", "thing_train2017")
+                )
+            # change extension to npz
+            basis_sem_path = osp.normpath(
+                osp.join(dataset_dict["file_name"].split('..')[0], dataset_dict["file_name"].split('\\')[-1]))
+            basis_sem_path = osp.splitext(basis_sem_path)[0] + ".npz"
+            basis_sem_gt = np.load(basis_sem_path)["mask"]
             basis_sem_gt = transforms.apply_segmentation(basis_sem_gt)
             basis_sem_gt = torch.as_tensor(basis_sem_gt.astype("long"))
             dataset_dict["basis_sem"] = basis_sem_gt
-
         return dataset_dict

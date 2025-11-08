@@ -24,7 +24,7 @@ _C.MODEL.FCOS.FPN_STRIDES = [8, 16, 32, 64, 128]
 _C.MODEL.FCOS.PRIOR_PROB = 0.01
 _C.MODEL.FCOS.INFERENCE_TH_TRAIN = 0.05
 _C.MODEL.FCOS.INFERENCE_TH_TEST = 0.05
-_C.MODEL.FCOS.NMS_TH = 0.6
+_C.MODEL.FCOS.NMS_TH = 0.7
 _C.MODEL.FCOS.PRE_NMS_TOPK_TRAIN = 1000
 _C.MODEL.FCOS.PRE_NMS_TOPK_TEST = 1000
 _C.MODEL.FCOS.POST_NMS_TOPK_TRAIN = 100
@@ -205,7 +205,7 @@ _C.MODEL.MEInst.NUM_MASK_CONVS = 4
 _C.MODEL.MEInst.DIM_MASK = 60
 _C.MODEL.MEInst.MASK_SIZE = 28
 # The default path for parameters of mask encoding.
-_C.MODEL.MEInst.PATH_COMPONENTS = "datasets/coco/components/" \
+_C.MODEL.MEInst.PATH_COMPONENTS = "dataset/coco/components/" \
                                    "coco_2017_train_class_agnosticTrue_whitenTrue_sigmoidTrue_60.npz"
 # An indicator for encoding parameters loading during training.
 _C.MODEL.MEInst.FLAG_PARAMETERS = False
@@ -277,7 +277,7 @@ _C.MODEL.BiFPN = CN()
 # They must have contiguous power of 2 strides
 # e.g., ["res2", "res3", "res4", "res5"]
 _C.MODEL.BiFPN.IN_FEATURES = ["res2", "res3", "res4", "res5"]
-_C.MODEL.BiFPN.OUT_CHANNELS = 160
+_C.MODEL.BiFPN.OUT_CHANNELS = 256
 _C.MODEL.BiFPN.NUM_REPEATS = 6
 
 # Options: "" (no norm), "GN"
@@ -361,4 +361,4 @@ _C.MODEL.FCPOSE.BASIS_MODULE.CONVS_DIM = 128
 _C.MODEL.FCPOSE.BASIS_MODULE.COMMON_STRIDE = 8
 _C.MODEL.FCPOSE.BASIS_MODULE.NUM_CLASSES = 17
 _C.MODEL.FCPOSE.BASIS_MODULE.LOSS_WEIGHT = 0.2
-_C.MODEL.FCPOSE.BASIS_MODULE.BN_TYPE = "SyncBN"
+_C.MODEL.FCPOSE.BASIS_MODULE.BN_TYPE = "BN"

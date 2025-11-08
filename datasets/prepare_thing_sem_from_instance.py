@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
@@ -17,6 +18,14 @@ def annToRLE(ann, img_size):
     h, w = img_size
     segm = ann['segmentation']
     if type(segm) == list:
+
+        # --- START OF FIX ---
+        # 检查空的 segmentation 列表
+        # Bug fix for TypeError: Argument 'bb' has incorrect type (expected numpy.ndarray, got list)
+        if not segm:
+            return maskUtils.encode(np.zeros((h, w), order='F', dtype=np.uint8))
+        # --- END OF FIX ---
+
         # polygon -- a single object might consist of multiple parts
         # we merge all parts into one mask rle code
         rles = maskUtils.frPyObjects(segm, h, w)
@@ -40,7 +49,15 @@ def _process_instance_to_semantic(anns, output_semantic, img, categories):
     img_size = (img["height"], img["width"])
     output = np.zeros(img_size, dtype=np.uint8)
     for ann in anns:
-        mask = annToMask(ann, img_size)
+        # --- START OF MODIFICATION ---
+        # 捕获 annToRLE 中可能出现的其他错误 (例如无效的 RLE)
+        try:
+            mask = annToMask(ann, img_size)
+        except Exception as e:
+            print(f"Error processing annotation {ann['id']} for image {img['file_name']}: {e}")
+            print("Skipping this annotation.")
+            continue  # 跳过这个损坏的标注
+        # --- END OF MODIFICATION ---
         output[mask == 1] = categories[ann["category_id"]] + 1
     # save as compressed npz
     np.savez_compressed(output_semantic, mask=output)
@@ -78,8 +95,8 @@ def create_coco_semantic_from_instance(instance_json, sem_seg_root, categories):
     # print("Start writing to {} ...".format(sem_seg_root))
     # start = time.time()
     # for anno, oup, img in iter_annotations():
-    #     _process_instance_to_semantic(
-    #         anno, oup, img, categories)
+    # 	_process_instance_to_semantic(
+    # 		anno, oup, img, categories)
     # print("Finished. time: {:.2f}s".format(time.time() - start))
     # return
 

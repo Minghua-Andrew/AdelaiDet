@@ -127,7 +127,7 @@ MODEL:
     - res5
     NORM: ''
     NUM_REPEATS: 6
-    OUT_CHANNELS: 160
+    OUT_CHANNELS: 256
   CONDINST:
     BOTTOM_PIXELS_REMOVED: -1
     MASK_BRANCH:
@@ -179,7 +179,7 @@ MODEL:
     LOSS_GAMMA: 2.0
     LOSS_NORMALIZER_CLS: fg
     LOSS_WEIGHT_CLS: 1.0
-    NMS_TH: 0.6
+    NMS_TH: 0.7
     NORM: GN
     NUM_BOX_CONVS: 4
     NUM_CLASSES: 2
@@ -206,7 +206,7 @@ MODEL:
   FCPOSE:
     ATTN_LEN: 2737
     BASIS_MODULE:
-      BN_TYPE: SyncBN
+      BN_TYPE: BN
       COMMON_STRIDE: 8
       CONVS_DIM: 128
       LOSS_WEIGHT: 0.2
@@ -276,7 +276,7 @@ MODEL:
     NUM_CLS_CONVS: 4
     NUM_MASK_CONVS: 4
     NUM_SHARE_CONVS: 0
-    PATH_COMPONENTS: datasets/coco/components/coco_2017_train_class_agnosticTrue_whitenTrue_sigmoidTrue_60.npz
+    PATH_COMPONENTS: dataset/coco/components/coco_2017_train_class_agnosticTrue_whitenTrue_sigmoidTrue_60.npz
     POST_NMS_TOPK_TEST: 100
     POST_NMS_TOPK_TRAIN: 100
     POS_RADIUS: 1.5
@@ -405,7 +405,7 @@ MODEL:
     TRAIN_ON_PRED_BOXES: false
   ROI_HEADS:
     BATCH_SIZE_PER_IMAGE: 512
-    CLASSES_NAME: sample
+    CLASSES_NAME: blast
     IN_FEATURES:
     - res4
     IOU_LABELS:
@@ -415,7 +415,7 @@ MODEL:
     - 0.5
     NAME: Res5ROIHeads
     NMS_THRESH_TEST: 0.5
-    NUM_CLASSES: 1
+    NUM_CLASSES: 2
     POSITIVE_FRACTION: 0.25
     PROPOSAL_APPEND_GT: true
     SCORE_THRESH_TEST: 0.05
