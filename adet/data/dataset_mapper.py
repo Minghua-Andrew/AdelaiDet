@@ -114,8 +114,8 @@ class DatasetMapperWithBasis(DatasetMapper):
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # USER: Write your own image loading if it's not from a file
 
-        file_name = dataset_dict["file_name"].split('..')[0] + dataset_dict["file_name"].split('\\')[-1]
-        # file_name = dataset_dict["file_name"].split('\\')[-1]
+        # Use file_name directly - it should be the full path or relative to image_root
+        file_name = dataset_dict["file_name"]
         try:
             image = utils.read_image(
                 file_name, format=self.image_format
@@ -223,7 +223,7 @@ class DatasetMapperWithBasis(DatasetMapper):
             if self.ann_set == "coco":
                 basis_sem_path = (
                     dataset_dict["file_name"]
-                    .replace("train", "thing_train")
+                    .replace("train2017", "thing_train2017")
                 )
             else:
                 basis_sem_path = (
@@ -232,8 +232,6 @@ class DatasetMapperWithBasis(DatasetMapper):
                     .replace("train2017", "thing_train2017")
                 )
             # change extension to npz
-            basis_sem_path = osp.normpath(
-                osp.join(dataset_dict["file_name"].split('..')[0], dataset_dict["file_name"].split('\\')[-1]))
             basis_sem_path = osp.splitext(basis_sem_path)[0] + ".npz"
             basis_sem_gt = np.load(basis_sem_path)["mask"]
             basis_sem_gt = transforms.apply_segmentation(basis_sem_gt)
